@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 from typing import Any
 
 import httpx
@@ -7,7 +8,10 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
 app = FastAPI()
 
-VLLM_URL = "http://127.0.0.1:8000/v1/chat/completions"
+VLLM_URL = os.getenv(
+    "VLLM_URL",
+    "http://127.0.0.1:8000/v1/chat/completions",
+)
 
 
 async def ping_loop(ws: WebSocket, interval: float = 10.0) -> None:

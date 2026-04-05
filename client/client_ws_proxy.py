@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import time
 import uuid
 from pathlib import Path
@@ -15,15 +16,21 @@ import uvicorn
 # 配置
 # =========================
 COOKIE_TXT_PATH = Path("cookie.txt")
-REMOTE_WSS_URL = "wss://XXX.com/5eb45d6a-11e4-4dbe-a98c-6ef08c533902/proxy/9000/ws"
+REMOTE_WSS_URL = os.getenv(
+    "REMOTE_WSS_URL",
+    "wss://XXX.com/5eb45d6a-11e4-4dbe-a98c-6ef08c533902/proxy/9000/ws",
+)
 
-ORIGIN = "XXX.com"
-REFERER = "XXX.com/5eb45d6a-11e4-4dbe-a98c-6ef08c533902/lab"
+ORIGIN = os.getenv("REMOTE_ORIGIN", "XXX.com")
+REFERER = os.getenv(
+    "REMOTE_REFERER",
+    "XXX.com/5eb45d6a-11e4-4dbe-a98c-6ef08c533902/lab",
+)
 
-LOCAL_HOST = "127.0.0.1"
-LOCAL_PORT = 18000
+LOCAL_HOST = os.getenv("LOCAL_HOST", "127.0.0.1")
+LOCAL_PORT = int(os.getenv("LOCAL_PORT", "18000"))
 
-MODEL_NAME = "Qwen/Qwen3.5-35B-A3B"
+MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen3.5-35B-A3B")
 
 # 控制台输出控制
 PRINT_STREAM_TO_CONSOLE = True
