@@ -14,10 +14,10 @@
 
 ## Startup Order
 
-1. Start the `server1` bridge that fronts your remote model endpoint. In this repo that bridge is `server/server_ws_proxy.py`.
+1. Start the `server1` bridge that fronts your remote model endpoint. In this repo that bridge is `server1/server_ws_proxy.py`.
    ```bash
    export VLLM_URL="http://127.0.0.1:8000/v1/chat/completions"
-   uvicorn server.server_ws_proxy:app --host 0.0.0.0 --port 8000
+   uvicorn server1.server_ws_proxy:app --host 0.0.0.0 --port 8000
    ```
 2. Start the evaluator service on the remote side.
    ```bash
@@ -29,7 +29,7 @@ The controller itself is library code today, so the entrypoint is whatever local
 
 ## Bridge Configuration
 
-`client/client_ws_proxy.py` now reads its remote bridge settings from environment variables:
+`bridge/client_ws_proxy.py` now reads its remote bridge settings from environment variables:
 
 - `REMOTE_WSS_URL`
 - `REMOTE_ORIGIN`
@@ -45,5 +45,5 @@ export REMOTE_WSS_URL="wss://your-server1-proxy/ws"
 export REMOTE_ORIGIN="https://your-server1-origin"
 export REMOTE_REFERER="https://your-server1-referer"
 export MODEL_NAME="Qwen/Qwen3.5-35B-A3B"
-python client/client_ws_proxy.py
+python bridge/client_ws_proxy.py
 ```
