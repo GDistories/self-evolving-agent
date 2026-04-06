@@ -1,8 +1,8 @@
 {
   "baseline_candidate": {
     "candidate_id": "baseline-v1",
-    "system_prompt": "You are a careful evaluator that follows the experiment policy.",
-    "user_template": "Classify the following input using the current experiment setup:\n{{input}}"
+    "system_prompt_file": "prompts/system.md",
+    "user_template": "Classify the following input using the current experiment setup:\n{text}"
   },
   "best_metrics": {
     "accuracy": 0.91,
