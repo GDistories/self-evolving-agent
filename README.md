@@ -22,7 +22,9 @@
 1. 在 `server1` 所在侧启动桥接后的模型代理：
 
    ```bash
-   export VLLM_URL="http://127.0.0.1:8000/v1/chat/completions"
+   cat > server1/.env <<'EOF'
+   VLLM_URL=http://127.0.0.1:8000/v1/chat/completions
+   EOF
    uvicorn server1.server_ws_proxy:app --host 0.0.0.0 --port 8000
    ```
 
@@ -35,15 +37,18 @@
 3. 在你本地运行控制器或你自己的驱动脚本，并把它指向两个远端基础地址：
 
    ```bash
-   export SERVER1_BASE_URL="http://<server1-host>:8000"
-   export SERVER2_BASE_URL="http://<server2-host>:19000"
+   cat > client/.env <<'EOF'
+   SERVER1_BASE_URL=http://<server1-host>:8000
+   SERVER2_BASE_URL=http://<server2-host>:19000
+   POLL_INTERVAL_SECONDS=2.0
+   EOF
    ```
 
 目前控制器主流程还是库代码，最小闭环入口是 `client/controller.py` 里的 `run_iteration(...)`。
 
 ### bridge 配置
 
-`bridge/client_ws_proxy.py` 通过环境变量读取桥接配置：
+`bridge/client_ws_proxy.py` 会优先读取 `bridge/.env`：
 
 - `REMOTE_WSS_URL`
 - `REMOTE_ORIGIN`
@@ -55,12 +60,19 @@
 示例：
 
 ```bash
-export REMOTE_WSS_URL="wss://your-server1-proxy/ws"
-export REMOTE_ORIGIN="https://your-server1-origin"
-export REMOTE_REFERER="https://your-server1-referer"
-export MODEL_NAME="Qwen/Qwen3.5-35B-A3B"
+cat > bridge/.env <<'EOF'
+REMOTE_WSS_URL=wss://your-server1-proxy/ws
+REMOTE_ORIGIN=https://your-server1-origin
+REMOTE_REFERER=https://your-server1-referer
+LOCAL_HOST=127.0.0.1
+LOCAL_PORT=18000
+MODEL_NAME=Qwen/Qwen3.5-35B-A3B
+EOF
 python bridge/client_ws_proxy.py
 ```
+
+`server1/server_ws_proxy.py` 会优先读取 `server1/.env`。  
+`server2/eval_service.py` 也会优先读取 `server2/.env`，这样你后续如果给 `server2` 加评测配置，不需要再改代码。
 
 ## Topology
 
@@ -78,7 +90,9 @@ python bridge/client_ws_proxy.py
 
 1. Start the `server1` bridge that fronts your remote model endpoint. In this repo that bridge is `server1/server_ws_proxy.py`.
    ```bash
-   export VLLM_URL="http://127.0.0.1:8000/v1/chat/completions"
+   cat > server1/.env <<'EOF'
+   VLLM_URL=http://127.0.0.1:8000/v1/chat/completions
+   EOF
    uvicorn server1.server_ws_proxy:app --host 0.0.0.0 --port 8000
    ```
 2. Start the evaluator service on the remote side.
@@ -87,11 +101,19 @@ python bridge/client_ws_proxy.py
    ```
 3. Run the local controller process or driver on your machine, pointing it at the two base URLs with `SERVER1_BASE_URL` and `SERVER2_BASE_URL`.
 
+   ```bash
+   cat > client/.env <<'EOF'
+   SERVER1_BASE_URL=http://<server1-host>:8000
+   SERVER2_BASE_URL=http://<server2-host>:19000
+   POLL_INTERVAL_SECONDS=2.0
+   EOF
+   ```
+
 The controller itself is library code today, so the entrypoint is whatever local runner imports `run_iteration` from `client/controller.py`.
 
 ## Bridge Configuration
 
-`bridge/client_ws_proxy.py` now reads its remote bridge settings from environment variables:
+`bridge/client_ws_proxy.py` now reads its remote bridge settings from `bridge/.env` first, then falls back to process environment variables:
 
 - `REMOTE_WSS_URL`
 - `REMOTE_ORIGIN`

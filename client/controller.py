@@ -62,9 +62,8 @@ def run_iteration(
     store_root: Path,
 ) -> IterationOutcome:
     store = ExperimentStore(store_root)
-    proposal = brain_client.propose_candidate(
-        messages=build_brain_messages(best_candidate, best_metrics)
-    )
+    brain_messages = build_brain_messages(best_candidate, best_metrics)
+    proposal = brain_client.propose_candidate(messages=brain_messages)
     challenger = Candidate(**proposal["candidate"])
     store.save_candidate(challenger)
 
@@ -80,15 +79,34 @@ def run_iteration(
     if submitted_job.get("status") in TERMINAL_JOB_STATUSES and isinstance(
         submitted_job.get("result"), dict
     ):
+        final_job = submitted_job
         metrics = _extract_metrics(submitted_job)
     else:
         job_id = submitted_job["job_id"]
-        metrics = _extract_metrics(evaluator_client.get_job(job_id))
+        final_job = evaluator_client.get_job(job_id)
+        metrics = _extract_metrics(final_job)
 
     decision = Judge().compare(best_metrics, metrics, metric_config)
-    return IterationOutcome(
+    outcome = IterationOutcome(
         best_candidate=challenger if decision.promote else best_candidate,
         challenger_candidate=challenger,
         decision=decision,
         metrics=metrics,
     )
+    store.save_iteration_record(
+        challenger.candidate_id,
+        {
+            "best_candidate_before": best_candidate.model_dump(mode="json"),
+            "best_metrics_before": best_metrics,
+            "brain_messages": brain_messages,
+            "proposal": proposal,
+            "challenger_candidate": challenger.model_dump(mode="json"),
+            "evaluator_payload": payload,
+            "submitted_job": submitted_job,
+            "final_job": final_job,
+            "decision": decision.model_dump(mode="json"),
+            "metrics": metrics,
+            "best_candidate_after": outcome.best_candidate.model_dump(mode="json"),
+        },
+    )
+    return outcome

@@ -223,6 +223,12 @@ def test_run_iteration_promotes_better_candidate(tmp_path: Path) -> None:
     assert outcome.decision.promote is True
     assert outcome.metrics == {"score": 0.91}
     assert (tmp_path / "candidates" / "cand-2.json").exists()
+    iteration_log = tmp_path / "iterations" / "cand-2.json"
+    assert iteration_log.exists()
+    iteration_text = iteration_log.read_text(encoding="utf-8")
+    assert '"decision"' in iteration_text
+    assert '"submitted_job"' in iteration_text
+    assert '"best_candidate_after"' in iteration_text
 
 
 def test_run_iteration_keeps_best_when_candidate_does_not_improve(

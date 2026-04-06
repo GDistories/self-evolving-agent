@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
+from typing import Any
 
 from client.models import Candidate
 
@@ -15,6 +17,20 @@ class ExperimentStore:
         path = self.root / "candidates" / f"{candidate.candidate_id}.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(candidate.model_dump_json(indent=2), encoding="utf-8")
+        return path
+
+    def save_iteration_record(
+        self,
+        candidate_id: str,
+        record: dict[str, Any],
+    ) -> Path:
+        self._validate_candidate_id(candidate_id)
+        path = self.root / "iterations" / f"{candidate_id}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(record, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
         return path
 
     def _validate_candidate_id(self, candidate_id: str) -> None:
