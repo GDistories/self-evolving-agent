@@ -1,0 +1,22 @@
+{
+  "baseline_candidate": {
+    "candidate_id": "baseline-v1",
+    "system_prompt": "You are a careful evaluator that follows the experiment policy.",
+    "user_template": "Classify the following input using the current experiment setup:\n{{input}}"
+  },
+  "best_metrics": {
+    "accuracy": 0.91,
+    "precision": 0.89
+  },
+  "metric_config": {
+    "primary_metric": "accuracy",
+    "min_value": 0.9,
+    "tp_path": "data/metrics/tp.jsonl",
+    "tn_path": "data/metrics/tn.jsonl"
+  },
+  "runner": {
+    "brain_model": "Qwen/Qwen3.5-35B-A3B",
+    "store_root": "runs/experiments",
+    "max_rounds": 10
+  }
+}

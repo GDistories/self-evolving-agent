@@ -68,7 +68,7 @@
    python bridge/server2/bridge.py
    ```
 
-5. 运行本地控制器。
+5. 运行本地客户端 runner。
 
    ```bash
    cat > client/.env <<'EOF'
@@ -78,7 +78,21 @@
    EOF
    ```
 
-目前控制器主流程还是库代码，最小闭环入口是 `client/controller.py` 里的 `run_iteration(...)`。
+`client/.env` 只控制运行时 URL 和轮询间隔。实验本身放在 `client/experiment.json`：
+
+- `baseline_candidate` 负责 baseline candidate、prompt text、`candidate_id`
+- `best_metrics` 负责初始最优指标
+- `metric_config` 负责 metric policy 和数据集路径，包括 `primary_metric`、`min_value`、`tp_path`、`tn_path`
+- `runner` 负责 `brain_model`、`store_root`、`max_rounds`
+
+prompt text 可以直接内联在 `system_prompt` / `user_template`，也可以通过 `system_prompt_file` / `user_template_file` 从文件读取；文件路径相对于 `client/experiment.json` 解析。示例配置可从 `client/experiment.json.example` 复制。
+
+运行方式：
+
+```bash
+python -m client.run_once
+python -m client.run_loop
+```
 
 ### bridge 配置
 
@@ -171,6 +185,7 @@ python bridge/server2/bridge.py
    LOCAL_HOST=127.0.0.1
    LOCAL_PORT=18000
    MODEL_NAME=Qwen/Qwen3.5-35B-A3B
+   COOKIE_FILE=cookie.txt
    EOF
    python bridge/server1/bridge.py
    ```
@@ -187,7 +202,7 @@ python bridge/server2/bridge.py
    EOF
    python bridge/server2/bridge.py
    ```
-5. Run the local controller process or driver on your machine, pointing it at the two local bridge base URLs with `SERVER1_BASE_URL` and `SERVER2_BASE_URL`.
+5. Run the local client runner on your machine.
 
    ```bash
    cat > client/.env <<'EOF'
@@ -197,7 +212,21 @@ python bridge/server2/bridge.py
    EOF
    ```
 
-The controller itself is library code today, so the entrypoint is whatever local runner imports `run_iteration` from `client/controller.py`.
+`client/.env` only controls runtime URLs and polling. The experiment configuration lives in `client/experiment.json`:
+
+- `baseline_candidate` owns the baseline candidate, prompt text, and `candidate_id`
+- `best_metrics` sets the initial best metrics
+- `metric_config` defines the metric policy and dataset paths: `primary_metric`, `min_value`, `tp_path`, and `tn_path`
+- `runner` sets `brain_model`, `store_root`, and `max_rounds`
+
+Prompt text can be inline in `system_prompt` / `user_template` or file-backed with `system_prompt_file` / `user_template_file`. File paths resolve relative to `client/experiment.json`. Copy `client/experiment.json.example` to get started.
+
+Run either client entrypoint with:
+
+```bash
+python -m client.run_once
+python -m client.run_loop
+```
 
 ## Bridge Configuration
 
@@ -210,6 +239,7 @@ The controller itself is library code today, so the entrypoint is whatever local
   - `LOCAL_HOST`
   - `LOCAL_PORT`
   - `MODEL_NAME`
+  - `COOKIE_FILE`
 - `bridge/server2/bridge.py`
   - `REMOTE_BASE_URL`
   - `REMOTE_ORIGIN`
