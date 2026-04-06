@@ -34,8 +34,20 @@ def load_experiment_config(config_path: Path) -> ExperimentConfig:
     runner = _require_mapping(payload, "runner")
 
     candidate_id = _require_nonempty_string(baseline_candidate, "candidate_id")
-    system_prompt = _require_nonempty_string(baseline_candidate, "system_prompt")
-    user_template = _require_nonempty_string(baseline_candidate, "user_template")
+    system_prompt = _require_prompt_source(
+        baseline_candidate,
+        config_path.parent,
+        field="system_prompt",
+        inline_key="system_prompt",
+        file_key="system_prompt_file",
+    )
+    user_template = _require_prompt_source(
+        baseline_candidate,
+        config_path.parent,
+        field="user_template",
+        inline_key="user_template",
+        file_key="user_template_file",
+    )
     primary_metric = _require_nonempty_string(metric_config, "primary_metric")
     tp_path = _require_nonempty_string(metric_config, "tp_path")
     tn_path = _require_nonempty_string(metric_config, "tn_path")
@@ -76,6 +88,38 @@ def _require_nonempty_string(payload: dict[str, Any], key: str) -> str:
     if not isinstance(value, str) or not value:
         raise ValueError(f"{key} must be a non-empty string")
     return value
+
+
+def _require_prompt_source(
+    payload: dict[str, Any],
+    config_dir: Path,
+    *,
+    field: str,
+    inline_key: str,
+    file_key: str,
+) -> str:
+    has_inline = inline_key in payload
+    has_file = file_key in payload
+    if has_inline and has_file:
+        raise ValueError(
+            f"{field} cannot specify both {inline_key} and {file_key}"
+        )
+    if not has_inline and not has_file:
+        raise ValueError(
+            f"missing required field: {field} (provide {inline_key} or {file_key})"
+        )
+    if has_inline:
+        return _require_nonempty_string(payload, inline_key)
+
+    file_path = _require_nonempty_string(payload, file_key)
+    prompt_path = config_dir / file_path
+    try:
+        prompt = prompt_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ValueError(f"{field} file could not be read: {prompt_path}") from exc
+    if not prompt:
+        raise ValueError(f"{field} must be a non-empty string")
+    return prompt
 
 
 def _require_positive_int(payload: dict[str, Any], key: str) -> int:
