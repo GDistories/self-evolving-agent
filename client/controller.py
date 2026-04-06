@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -60,6 +61,7 @@ def run_iteration(
     brain_client: Any,
     evaluator_client: Any,
     store_root: Path,
+    poll_interval_seconds: float = 2.0,
 ) -> IterationOutcome:
     store = ExperimentStore(store_root)
     brain_messages = build_brain_messages(best_candidate, best_metrics)
@@ -84,6 +86,9 @@ def run_iteration(
     else:
         job_id = submitted_job["job_id"]
         final_job = evaluator_client.get_job(job_id)
+        while final_job.get("status") not in TERMINAL_JOB_STATUSES:
+            time.sleep(poll_interval_seconds)
+            final_job = evaluator_client.get_job(job_id)
         metrics = _extract_metrics(final_job)
 
     decision = Judge().compare(best_metrics, metrics, metric_config)

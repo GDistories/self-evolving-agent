@@ -78,7 +78,7 @@
    EOF
    ```
 
-`client/.env` 只控制运行时 URL 和轮询间隔。实验本身放在 `client/experiment.json`：
+`client/.env` 只控制运行时 URL，以及客户端等待 `server2` 评测 job 完成时使用的轮询间隔。实验本身放在 `client/experiment.json`：
 
 - `baseline_candidate` 负责 baseline candidate、prompt text、`candidate_id`
 - `best_metrics` 负责初始最优指标
@@ -212,7 +212,7 @@ python bridge/server2/bridge.py
    EOF
    ```
 
-`client/.env` only controls runtime URLs and polling. The experiment configuration lives in `client/experiment.json`:
+`client/.env` only controls runtime URLs and the polling interval used while the client waits for `server2` evaluation jobs to finish. The experiment configuration lives in `client/experiment.json`:
 
 - `baseline_candidate` owns the baseline candidate, prompt text, and `candidate_id`
 - `best_metrics` sets the initial best metrics

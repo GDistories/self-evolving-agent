@@ -32,6 +32,7 @@ def run_loop(config_path: Path | None = None) -> None:
             brain_client=brain_client,
             evaluator_client=evaluator_client,
             store_root=Path(experiment.runner.store_root),
+            poll_interval_seconds=runtime.poll_interval_seconds,
         )
 
         if outcome.decision.promote:

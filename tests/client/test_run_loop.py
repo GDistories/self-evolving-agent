@@ -59,6 +59,7 @@ def _install_fakes(
         class Runtime:
             server1_base_url = "http://127.0.0.1:18000"
             server2_base_url = "http://127.0.0.1:19000"
+            poll_interval_seconds = 2.0
 
         return Runtime()
 
@@ -68,6 +69,7 @@ def _install_fakes(
 
     def fake_run_iteration(**kwargs):
         run_iteration_calls.append(kwargs)
+        assert kwargs["poll_interval_seconds"] == 2.0
         return outcomes[len(run_iteration_calls) - 1]
 
     monkeypatch.setattr("client.run_loop.load_runtime_config", fake_load_runtime_config)
@@ -235,6 +237,7 @@ def test_run_loop_keeps_existing_best_when_decision_is_not_promote(
         class Runtime:
             server1_base_url = "http://127.0.0.1:18000"
             server2_base_url = "http://127.0.0.1:19000"
+            poll_interval_seconds = 2.0
 
         return Runtime()
 
@@ -246,6 +249,7 @@ def test_run_loop_keeps_existing_best_when_decision_is_not_promote(
         else:
             assert kwargs["best_candidate"].candidate_id == "baseline-v1"
             assert kwargs["best_metrics"] == {"score": 0.6}
+        assert kwargs["poll_interval_seconds"] == 2.0
         return outcomes[len(run_iteration_calls) - 1]
 
     monkeypatch.setattr("client.run_loop.load_runtime_config", fake_load_runtime_config)

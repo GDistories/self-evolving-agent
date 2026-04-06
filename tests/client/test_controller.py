@@ -335,3 +335,72 @@ def test_run_iteration_uses_inline_cached_result_without_fetching_job(
     assert outcome.best_candidate.candidate_id == "cand-4"
     assert outcome.decision.promote is True
     assert outcome.metrics == {"score": 0.92}
+
+
+def test_run_iteration_polls_until_job_reaches_terminal_status(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    class FakeBrain:
+        def propose_candidate(self, messages: list[dict[str, object]]) -> dict[str, object]:
+            return {
+                "candidate": {
+                    "candidate_id": "cand-5",
+                    "parent_candidate_id": "cand-1",
+                    "system_prompt": "polling prompt",
+                    "user_template": "{text}",
+                    "mutation_note": "wait for async evaluation",
+                }
+            }
+
+    class FakeEvaluator:
+        def __init__(self) -> None:
+            self.get_job_calls = 0
+
+        def submit_job(self, payload: dict[str, object]) -> dict[str, object]:
+            return {"job_id": "job-5", "status": "queued"}
+
+        def get_job(self, job_id: str) -> dict[str, object]:
+            self.get_job_calls += 1
+            if self.get_job_calls == 1:
+                return {"job_id": job_id, "status": "running"}
+            return {
+                "job_id": job_id,
+                "status": "completed",
+                "result": {"merged_metrics": {"score": 0.93}},
+            }
+
+    sleep_calls: list[float] = []
+
+    def fake_sleep(seconds: float) -> None:
+        sleep_calls.append(seconds)
+
+    monkeypatch.setattr("client.controller.time.sleep", fake_sleep)
+
+    best = Candidate(
+        candidate_id="cand-1",
+        system_prompt="old prompt",
+        user_template="{text}",
+        status="best",
+    )
+    evaluator = FakeEvaluator()
+
+    outcome = run_iteration(
+        best_candidate=best,
+        best_metrics={"score": 0.80},
+        metric_config={
+            "primary_metric": "score",
+            "min_value": 0.85,
+            "tp_path": "/tmp/tp.jsonl",
+            "tn_path": "/tmp/tn.jsonl",
+        },
+        brain_client=FakeBrain(),
+        evaluator_client=evaluator,
+        store_root=tmp_path,
+        poll_interval_seconds=1.5,
+    )
+
+    assert evaluator.get_job_calls == 2
+    assert sleep_calls == [1.5]
+    assert outcome.best_candidate.candidate_id == "cand-5"
+    assert outcome.metrics == {"score": 0.93}

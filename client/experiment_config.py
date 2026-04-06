@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from json import JSONDecodeError
 from pathlib import Path
 from typing import Any
 
@@ -24,7 +25,10 @@ class ExperimentConfig:
 
 
 def load_experiment_config(config_path: Path) -> ExperimentConfig:
-    payload = json.loads(config_path.read_text(encoding="utf-8"))
+    try:
+        payload = json.loads(config_path.read_text(encoding="utf-8"))
+    except JSONDecodeError as exc:
+        raise ValueError(f"invalid experiment config JSON: {config_path}") from exc
     if not isinstance(payload, dict):
         raise ValueError("experiment config must be a JSON object")
 

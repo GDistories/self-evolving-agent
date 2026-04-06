@@ -24,6 +24,7 @@ def run_once(config_path: Path | None = None) -> None:
         ),
         evaluator_client=EvaluatorClient(base_url=runtime.server2_base_url),
         store_root=Path(experiment.runner.store_root),
+        poll_interval_seconds=runtime.poll_interval_seconds,
     )
 
     print(f"baseline_candidate_id={experiment.baseline_candidate.candidate_id}")

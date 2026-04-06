@@ -544,3 +544,23 @@ def test_load_experiment_config_rejects_bool_max_rounds(
         assert "max_rounds must be a positive int" in str(exc)
     else:
         raise AssertionError("expected ValueError")
+
+
+def test_load_experiment_config_wraps_invalid_json_as_value_error(
+    tmp_path: Path,
+) -> None:
+    config_path = _write_config(
+        tmp_path,
+        """
+{
+  "baseline_candidate": {
+    "candidate_id": "baseline-v1",
+""",
+    )
+
+    try:
+        load_experiment_config(config_path)
+    except ValueError as exc:
+        assert "invalid experiment config JSON" in str(exc)
+    else:
+        raise AssertionError("expected ValueError")

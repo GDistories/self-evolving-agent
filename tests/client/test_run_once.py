@@ -53,6 +53,7 @@ def _install_fakes(monkeypatch, tmp_path: Path, load_experiment_capture: dict[st
         class Runtime:
             server1_base_url = "http://127.0.0.1:18000"
             server2_base_url = "http://127.0.0.1:19000"
+            poll_interval_seconds = 2.0
 
         return Runtime()
 
@@ -68,6 +69,7 @@ def _install_fakes(monkeypatch, tmp_path: Path, load_experiment_capture: dict[st
         assert kwargs["brain_client"].model == "gpt-test"
         assert kwargs["evaluator_client"].base_url == "http://127.0.0.1:19000"
         assert kwargs["store_root"] == tmp_path
+        assert kwargs["poll_interval_seconds"] == 2.0
         return type(
             "IterationOutcome",
             (),
