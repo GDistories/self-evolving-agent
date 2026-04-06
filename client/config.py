@@ -41,7 +41,7 @@ def load_runtime_config() -> RuntimeConfig:
         )
 
     return RuntimeConfig(
-        server1_base_url=os.getenv("SERVER1_BASE_URL", "http://127.0.0.1:8000"),
+        server1_base_url=os.getenv("SERVER1_BASE_URL", "http://127.0.0.1:18000"),
         server2_base_url=os.getenv("SERVER2_BASE_URL", "http://127.0.0.1:19000"),
         poll_interval_seconds=poll_interval_seconds,
     )

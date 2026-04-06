@@ -29,7 +29,7 @@ def test_evaluator_client_builds_job_payload() -> None:
     assert payload["metric_config"]["primary_metric"] == "score"
 
 
-def test_load_runtime_config_uses_defaults(monkeypatch) -> None:
+def test_load_runtime_config_uses_local_bridge_defaults(monkeypatch) -> None:
     monkeypatch.delenv("SERVER1_BASE_URL", raising=False)
     monkeypatch.delenv("SERVER2_BASE_URL", raising=False)
     monkeypatch.delenv("POLL_INTERVAL_SECONDS", raising=False)
@@ -37,7 +37,7 @@ def test_load_runtime_config_uses_defaults(monkeypatch) -> None:
     config = load_runtime_config()
 
     assert config == RuntimeConfig(
-        server1_base_url="http://127.0.0.1:8000",
+        server1_base_url="http://127.0.0.1:18000",
         server2_base_url="http://127.0.0.1:19000",
         poll_interval_seconds=2.0,
     )

@@ -9,7 +9,11 @@
 - `server2` 是远端评测服务，对外暴露普通 HTTP 接口：
   - `POST /eval/jobs`
   - `GET /eval/jobs/{job_id}`
-- `bridge/client_ws_proxy.py` 是你本地到远端 `server1` 的桥接脚本，适合处理大模型长回复和超时问题。
+- 本地桥接层分成两个独立进程：
+  - `bridge/server1/bridge.py`
+  - `bridge/server2/bridge.py`
+- `bridge/server1/` 和 `bridge/server2/` 各自使用单独的 `cookie.txt`。
+- 本地客户端只访问本地桥接 URL，不直接连远端服务。
 
 ### 标签映射
 
@@ -19,7 +23,7 @@
 
 ### 启动顺序
 
-1. 在 `server1` 所在侧启动桥接后的模型代理：
+1. 先启动 `server1`。
 
    ```bash
    cat > server1/.env <<'EOF'
@@ -28,18 +32,48 @@
    uvicorn server1.server_ws_proxy:app --host 0.0.0.0 --port 8000
    ```
 
-2. 在 `server2` 所在侧启动评测服务：
+2. 再启动 `server2`。
 
    ```bash
    uvicorn server2.eval_service:app --host 0.0.0.0 --port 19000
    ```
 
-3. 在你本地运行控制器或你自己的驱动脚本，并把它指向两个远端基础地址：
+3. 在本地启动 `bridge/server1/bridge.py`。
+
+   ```bash
+   cat > bridge/server1/.env <<'EOF'
+   REMOTE_WSS_URL=wss://<server1-host>/v1/chat/completions
+   REMOTE_ORIGIN=https://<server1-origin>
+   REMOTE_REFERER=https://<server1-referer>
+   LOCAL_HOST=127.0.0.1
+   LOCAL_PORT=18000
+   MODEL_NAME=Qwen/Qwen3.5-35B-A3B
+   COOKIE_FILE=cookie.txt
+   EOF
+   python bridge/server1/bridge.py
+   ```
+
+4. 在本地启动 `bridge/server2/bridge.py`。
+
+   ```bash
+   cat > bridge/server2/.env <<'EOF'
+   REMOTE_BASE_URL=https://<server2-host>/proxy/19000
+   REMOTE_ORIGIN=https://<server2-origin>
+   REMOTE_REFERER=https://<server2-referer>
+   LOCAL_HOST=127.0.0.1
+   LOCAL_PORT=19000
+   COOKIE_FILE=cookie.txt
+   REQUEST_TIMEOUT_SECONDS=30
+   EOF
+   python bridge/server2/bridge.py
+   ```
+
+5. 运行本地控制器。
 
    ```bash
    cat > client/.env <<'EOF'
-   SERVER1_BASE_URL=http://<server1-host>:8000
-   SERVER2_BASE_URL=http://<server2-host>:19000
+   SERVER1_BASE_URL=http://127.0.0.1:18000
+   SERVER2_BASE_URL=http://127.0.0.1:19000
    POLL_INTERVAL_SECONDS=2.0
    EOF
    ```
@@ -48,27 +82,51 @@
 
 ### bridge 配置
 
-`bridge/client_ws_proxy.py` 会优先读取 `bridge/.env`：
+`bridge/server1/bridge.py` 会优先读取 `bridge/server1/.env`，`bridge/server2/bridge.py` 会优先读取 `bridge/server2/.env`：
 
-- `REMOTE_WSS_URL`
-- `REMOTE_ORIGIN`
-- `REMOTE_REFERER`
-- `LOCAL_HOST`
-- `LOCAL_PORT`
-- `MODEL_NAME`
+- `bridge/server1/bridge.py`
+  - `REMOTE_WSS_URL`
+  - `REMOTE_ORIGIN`
+  - `REMOTE_REFERER`
+  - `LOCAL_HOST`
+  - `LOCAL_PORT`
+  - `MODEL_NAME`
+  - `COOKIE_FILE`
+- `bridge/server2/bridge.py`
+  - `REMOTE_BASE_URL`
+  - `REMOTE_ORIGIN`
+  - `REMOTE_REFERER`
+  - `LOCAL_HOST`
+  - `LOCAL_PORT`
+  - `COOKIE_FILE`
+  - `REQUEST_TIMEOUT_SECONDS`
 
 示例：
 
 ```bash
-cat > bridge/.env <<'EOF'
+cat > bridge/server1/.env <<'EOF'
 REMOTE_WSS_URL=wss://your-server1-proxy/ws
 REMOTE_ORIGIN=https://your-server1-origin
 REMOTE_REFERER=https://your-server1-referer
 LOCAL_HOST=127.0.0.1
 LOCAL_PORT=18000
 MODEL_NAME=Qwen/Qwen3.5-35B-A3B
+COOKIE_FILE=cookie.txt
 EOF
-python bridge/client_ws_proxy.py
+python bridge/server1/bridge.py
+```
+
+```bash
+cat > bridge/server2/.env <<'EOF'
+REMOTE_BASE_URL=https://your-server2-proxy
+REMOTE_ORIGIN=https://your-server2-origin
+REMOTE_REFERER=https://your-server2-referer
+LOCAL_HOST=127.0.0.1
+LOCAL_PORT=19000
+COOKIE_FILE=cookie.txt
+REQUEST_TIMEOUT_SECONDS=30
+EOF
+python bridge/server2/bridge.py
 ```
 
 `server1/server_ws_proxy.py` 会优先读取 `server1/.env`。  
@@ -79,6 +137,11 @@ python bridge/client_ws_proxy.py
 - The local machine runs the controller logic from `client/controller.py`.
 - `server1` is the remote LLM brain exposed as an OpenAI-compatible `POST /v1/chat/completions` endpoint.
 - `server2` is the remote evaluator exposed over ordinary HTTP with `POST /eval/jobs` and `GET /eval/jobs/{job_id}`.
+- The local bridge layer is split into:
+  - `bridge/server1/bridge.py`
+  - `bridge/server2/bridge.py`
+- Each local bridge uses its own `cookie.txt`.
+- The controller only talks to local bridge URLs such as `http://127.0.0.1:18000` and `http://127.0.0.1:19000`.
 
 ## Label Mapping
 
@@ -88,23 +151,48 @@ python bridge/client_ws_proxy.py
 
 ## Startup Order
 
-1. Start the `server1` bridge that fronts your remote model endpoint. In this repo that bridge is `server1/server_ws_proxy.py`.
+1. Start `server1`.
    ```bash
    cat > server1/.env <<'EOF'
    VLLM_URL=http://127.0.0.1:8000/v1/chat/completions
    EOF
    uvicorn server1.server_ws_proxy:app --host 0.0.0.0 --port 8000
    ```
-2. Start the evaluator service on the remote side.
+2. Start `server2`.
    ```bash
    uvicorn server2.eval_service:app --host 0.0.0.0 --port 19000
    ```
-3. Run the local controller process or driver on your machine, pointing it at the two base URLs with `SERVER1_BASE_URL` and `SERVER2_BASE_URL`.
+3. Start the local `bridge/server1/bridge.py` process.
+   ```bash
+   cat > bridge/server1/.env <<'EOF'
+   REMOTE_WSS_URL=wss://<server1-host>/v1/chat/completions
+   REMOTE_ORIGIN=https://<server1-origin>
+   REMOTE_REFERER=https://<server1-referer>
+   LOCAL_HOST=127.0.0.1
+   LOCAL_PORT=18000
+   MODEL_NAME=Qwen/Qwen3.5-35B-A3B
+   EOF
+   python bridge/server1/bridge.py
+   ```
+4. Start the local `bridge/server2/bridge.py` process.
+   ```bash
+   cat > bridge/server2/.env <<'EOF'
+   REMOTE_BASE_URL=https://<server2-host>/proxy/19000
+   REMOTE_ORIGIN=https://<server2-origin>
+   REMOTE_REFERER=https://<server2-referer>
+   LOCAL_HOST=127.0.0.1
+   LOCAL_PORT=19000
+   COOKIE_FILE=cookie.txt
+   REQUEST_TIMEOUT_SECONDS=30
+   EOF
+   python bridge/server2/bridge.py
+   ```
+5. Run the local controller process or driver on your machine, pointing it at the two local bridge base URLs with `SERVER1_BASE_URL` and `SERVER2_BASE_URL`.
 
    ```bash
    cat > client/.env <<'EOF'
-   SERVER1_BASE_URL=http://<server1-host>:8000
-   SERVER2_BASE_URL=http://<server2-host>:19000
+   SERVER1_BASE_URL=http://127.0.0.1:18000
+   SERVER2_BASE_URL=http://127.0.0.1:19000
    POLL_INTERVAL_SECONDS=2.0
    EOF
    ```
@@ -113,14 +201,23 @@ The controller itself is library code today, so the entrypoint is whatever local
 
 ## Bridge Configuration
 
-`bridge/client_ws_proxy.py` now reads its remote bridge settings from `bridge/.env` first, then falls back to process environment variables:
+`bridge/server1/bridge.py` reads its settings from `bridge/server1/.env` first, then falls back to process environment variables. `bridge/server2/bridge.py` does the same with `bridge/server2/.env`:
 
-- `REMOTE_WSS_URL`
-- `REMOTE_ORIGIN`
-- `REMOTE_REFERER`
-- `LOCAL_HOST`
-- `LOCAL_PORT`
-- `MODEL_NAME`
+- `bridge/server1/bridge.py`
+  - `REMOTE_WSS_URL`
+  - `REMOTE_ORIGIN`
+  - `REMOTE_REFERER`
+  - `LOCAL_HOST`
+  - `LOCAL_PORT`
+  - `MODEL_NAME`
+- `bridge/server2/bridge.py`
+  - `REMOTE_BASE_URL`
+  - `REMOTE_ORIGIN`
+  - `REMOTE_REFERER`
+  - `LOCAL_HOST`
+  - `LOCAL_PORT`
+  - `COOKIE_FILE`
+  - `REQUEST_TIMEOUT_SECONDS`
 
 Example:
 
@@ -129,5 +226,14 @@ export REMOTE_WSS_URL="wss://your-server1-proxy/ws"
 export REMOTE_ORIGIN="https://your-server1-origin"
 export REMOTE_REFERER="https://your-server1-referer"
 export MODEL_NAME="Qwen/Qwen3.5-35B-A3B"
-python bridge/client_ws_proxy.py
+export COOKIE_FILE="cookie.txt"
+python bridge/server1/bridge.py
+```
+
+```bash
+export REMOTE_BASE_URL="https://your-server2-proxy"
+export REMOTE_ORIGIN="https://your-server2-origin"
+export REMOTE_REFERER="https://your-server2-referer"
+export COOKIE_FILE="cookie.txt"
+python bridge/server2/bridge.py
 ```
