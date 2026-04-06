@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 import httpx
+import requests
 from fastapi import FastAPI, HTTPException, Request, Response
 
 DEFAULT_REMOTE_BASE_URL = "https://your-host/proxy/19000"
@@ -77,6 +78,11 @@ def build_upstream_headers(content_type: str | None = None) -> dict[str, str]:
         "Cookie": read_cookie_value(resolve_cookie_file_path()),
         "Origin": get_remote_origin(),
         "Referer": get_remote_referer(),
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
     }
     if content_type:
         headers["Content-Type"] = content_type
@@ -85,25 +91,40 @@ def build_upstream_headers(content_type: str | None = None) -> dict[str, str]:
 
 def forward_upstream(method: str, path: str, content: bytes | None = None, content_type: str | None = None) -> Response:
     url = f"{get_remote_base_url().rstrip('/')}{path}"
+    print(f"正在请求远端: {method} {url}")
+
     try:
         headers = build_upstream_headers(content_type)
-        upstream = httpx.request(
-            method,
-            url,
-            content=content,
+
+        upstream = requests.request(
+            method=method,
+            url=url,
+            data=content,
             headers=headers,
             timeout=get_request_timeout_seconds(),
+            verify=False,
+            allow_redirects=True,
         )
-    except httpx.TimeoutException as exc:
-        raise HTTPException(status_code=504, detail="upstream timeout") from exc
-    except httpx.TransportError as exc:
-        raise HTTPException(status_code=502, detail=f"upstream transport error: {exc}") from exc
+
+        print("upstream status:", upstream.status_code)
+        print("upstream final url:", upstream.url)
+        print("upstream response headers:", dict(upstream.headers))
+        print("upstream response preview:", upstream.text[:500])
+
+    except requests.exceptions.Timeout as exc:
+        print("timeout detail:", repr(exc))
+        raise HTTPException(status_code=504, detail=f"upstream timeout: {exc}") from exc
+    except requests.exceptions.RequestException as exc:
+        print("request error detail:", repr(exc))
+        raise HTTPException(status_code=502, detail=f"upstream request error: {exc}") from exc
     except (FileNotFoundError, ValueError) as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    media_type = upstream.headers.get("content-type")
-    return Response(content=upstream.content, status_code=upstream.status_code, media_type=media_type)
-
+    return Response(
+        content=upstream.content,
+        status_code=upstream.status_code,
+        media_type=upstream.headers.get("content-type"),
+    )
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Local Server2 Bridge")
@@ -125,3 +146,10 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+
+import uvicorn
+
+if __name__ == "__main__":
+    # 使用你在代码前面解析出的 LOCAL_HOST 和 LOCAL_PORT
+    print(f"Starting server on http://{LOCAL_HOST}:{LOCAL_PORT}")
+    uvicorn.run("bridge2:app", host=LOCAL_HOST, port=LOCAL_PORT, reload=True)
