@@ -35,6 +35,10 @@
 2. 再启动 `server2`。
 
    ```bash
+   cat > server2/.env <<'EOF'
+   SERVER2_MODEL_PATH=Qwen3-8B
+   SERVER2_MODEL_LIFECYCLE_MODE=lazy_reuse
+   EOF
    uvicorn server2.eval_service:app --host 0.0.0.0 --port 19000
    ```
 
@@ -132,6 +136,24 @@ python -m client.run_loop
 - `python -m client.run_loop`
   - 连续跑到 `runner.max_rounds`
 
+如果你不想通过 HTTP 服务，而是想在 `server2` 机器上直接跑一次本地评测，也可以使用：
+
+```bash
+python -m server2.batch_run \
+  --system-prompt-file server2/prompts/system.md \
+  --user-template '待分类文本：\n{text}\n' \
+  --tp-dataset /path/on/server2/tp.jsonl \
+  --tn-dataset /path/on/server2/tn.jsonl \
+  --model-lifecycle-mode lazy_reuse \
+  --model-path Qwen3-8B \
+  --output /tmp/server2-batch-result.json
+```
+
+- `server2.batch_run`
+  - 复用 `server2` 的正式评测逻辑做单次本地运行
+- `server2.eval_service`
+  - 复用同一套核心逻辑，对外提供 `POST /eval/jobs` 和 `GET /eval/jobs/{job_id}`
+
 ### bridge 配置
 
 `bridge/server1/bridge.py` 会优先读取 `bridge/server1/.env`，`bridge/server2/bridge.py` 会优先读取 `bridge/server2/.env`：
@@ -183,6 +205,17 @@ python bridge/server2/bridge.py
 
 `server1/server_ws_proxy.py` 会优先读取 `server1/.env`。  
 `server2/eval_service.py` 也会优先读取 `server2/.env`，这样你后续如果给 `server2` 加评测配置，不需要再改代码。
+
+- `server2/.env`
+  - `SERVER2_MODEL_PATH`
+  - `SERVER2_MODEL_LIFECYCLE_MODE`
+    - `lazy_reuse`: 第一个 job 来时加载 8B，后续复用
+    - `per_job`: 每个 job 单独加载 8B，结束后释放
+  - `SERVER2_TENSOR_PARALLEL_SIZE`
+  - `SERVER2_MAX_MODEL_LEN`
+  - `SERVER2_MAX_NUM_SEQS`
+  - `SERVER2_MAX_NUM_BATCHED_TOKENS`
+  - `SERVER2_ENABLE_PREFIX_CACHING`
 
 ## Topology
 

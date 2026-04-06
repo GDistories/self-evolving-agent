@@ -9,8 +9,8 @@ class EvalJobRequest:
     candidate_id: str
     system_prompt: str
     user_template: str
-    tp_dataset: list[str]
-    tn_dataset: list[str]
+    tp_dataset: str
+    tn_dataset: str
     metric_config: dict[str, Any] = field(default_factory=dict)
     inference_config: dict[str, Any] = field(default_factory=dict)
 
